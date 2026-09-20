@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Parking Lot Occupancy Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Parking Lot Occupancy Detector</h1>
+        <p class="subtitle">Upload a parking lot photo to check availability and find a spot.</p>
+
+        <form action="/predict" method="post" enctype="multipart/form-data" class="upload-form" id="upload-form">
+            <input type="file" name="image" accept="image/*" required>
+            <button type="submit" id="analyze-btn">Analyze</button>
+        </form>
+
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <p>Analyzing parking spaces...</p>
+        </div>
+
+        {% if result %}
+        <div class="results">
+
+            <div class="status-banner status-{{ result.status }}">
+                {{ result.message }}
+            </div>
+
+            <div class="image-wrap">
+                <div class="image-stage" id="image-stage">
+                    <img src="/{{ result.image_path }}" alt="Parking lot" class="result-image">
+
+                    {% for space in result.spaces %}
+                    <div class="marker marker-{{ space.status }}{% if space.recommended %} marker-recommended{% endif %}"
+                         style="left: {{ space.left }}%; top: {{ space.top }}%; width: {{ space.width }}%; height: {{ space.height }}%;"
+                         data-label="{{ space.label }}"
+                         id="{% if space.recommended %}recommended-marker{% endif %}">
+                        {% if space.recommended %}
+                        <div class="park-arrow">PARK HERE ↓</div>
+                        {% endif %}
+                        <span class="marker-tooltip">{{ space.label }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if result.mode == 'precise' %}
+            <div class="stats">
+                <div class="stat-box empty">
+                    <span class="stat-number">{{ result.empty }}</span>
+                    <span class="stat-label">Empty</span>
+                </div>
+                <div class="stat-box occupied">
+                    <span class="stat-number">{{ result.occupied }}</span>
+                    <span class="stat-label">Occupied</span>
+                </div>
+                <div class="stat-box total">
+                    <span class="stat-number">{{ result.occupancy_rate }}%</span>
+                    <span class="stat-label">Occupancy Rate</span>
+                </div>
+            </div>
+
+            {% if result.empty_spaces %}
+            <div class="space-list">
+                <h3>Available Spaces</h3>
+                <p class="space-list-hint">Click a space to locate it on the image.</p>
+                <div class="space-chips">
+                    {% for space in result.empty_spaces %}
+                    <button class="space-chip" data-target="{{ loop.index0 }}">{{ space.label }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% elif result.mode == 'general' %}
+            <div class="stats">
+                <div class="stat-box occupied">
+                    <span class="stat-number">{{ result.occupied }}</span>
+                    <span class="stat-label">Vehicles Detected</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const overlay = document.getElementById('loading-overlay');
+        const button = document.getElementById('analyze-btn');
+
+        form.addEventListener('submit', function () {
+            overlay.classList.remove('hidden');
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
+        });
+
+        // Clicking a "Space #N" chip scrolls to and flashes that empty
+        // marker on the image, so the user can visually locate it.
+        const emptyMarkers = Array.from(document.querySelectorAll('.marker-empty'));
+        document.querySelectorAll('.space-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                const idx = parseInt(chip.dataset.target, 10);
+                const marker = emptyMarkers[idx];
+                if (!marker) return;
+
+                marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                marker.classList.add('marker-flash');
+                setTimeout(function () {
+                    marker.classList.remove('marker-flash');
+                }, 1200);
+            });
+        });
+    </script>
+</body>
+</html>
